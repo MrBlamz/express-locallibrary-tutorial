@@ -101,13 +101,42 @@ exports.genre_create_post = [
 ];
 
 // Display Genre delete form on GET.
-exports.genre_delete_get = (req, res) => {
-  res.send('NOT IMPLEMENTED: Genre delete GET');
+exports.genre_delete_get = (req, res, next) => {
+  const { id } = req.params;
+
+  async.parallel(
+    {
+      genre(callback) {
+        Genre.findById(id).exec(callback);
+      },
+      books(callback) {
+        Book.find({ genre: id }).populate('author').exec(callback);
+      },
+    },
+    (err, results) => {
+      const { genre, books } = results;
+
+      if (err) return next(err);
+
+      res.render('genre_delete', {
+        title: 'Delete Genre',
+        genre,
+        books,
+      });
+    }
+  );
 };
 
 // Handle Genre delete on POST.
-exports.genre_delete_post = (req, res) => {
-  res.send('NOT IMPLEMENTED: Genre delete POST');
+exports.genre_delete_post = (req, res, next) => {
+  const { genre_id } = req.body;
+
+  Genre.findByIdAndRemove(genre_id, (err) => {
+    if (err) return next(err);
+
+    // Success go to genres list
+    res.redirect('/catalog/genres');
+  });
 };
 
 // Display Genre update form on GET.
