@@ -76,6 +76,7 @@ exports.genre_create_post = [
         genre,
         errors: errors.array(),
       });
+
       return;
     }
 
@@ -140,11 +141,86 @@ exports.genre_delete_post = (req, res, next) => {
 };
 
 // Display Genre update form on GET.
-exports.genre_update_get = (req, res) => {
-  res.send('NOT IMPLEMENTED: Genre update GET');
+exports.genre_update_get = (req, res, next) => {
+  const { id } = req.params;
+
+  Genre.findById(id, (err, genre) => {
+    if (err) return next(err);
+
+    if (genre === null) {
+      // No genre found
+      const err = new Error('Genre not found!');
+      err.status = 404;
+      return next(err);
+    }
+
+    // Success
+    res.render('genre_form', {
+      title: 'Update Genre',
+      genre,
+    });
+  });
 };
 
 // Handle Genre update on POST.
-exports.genre_update_post = (req, res) => {
-  res.send('NOT IMPLEMENTED: Genre update POST');
-};
+exports.genre_update_post = [
+  // Validate and sanitize the name field
+  body('name', 'Genre name required').trim().isLength({ min: 1 }).escape(),
+
+  // Process request after validation sanitization
+  (req, res, next) => {
+    // Extract the validation errors from request
+    const errors = validationResult(req);
+
+    const { id } = req.params;
+    const { name } = req.body;
+
+    // Create a genre object with escaped and trimmed data and old id.
+    const genre = new Genre({
+      name,
+      _id: id, // This is required or a new ID will be assigned!
+    });
+
+    // There are errors. Render the form again with sanitized values/error messages
+    if (!errors.isEmpty()) {
+      res.render('genre_form', {
+        title: 'Update Genre',
+        genre,
+        errors: errors.array(),
+      });
+
+      return;
+    }
+
+    // Check if Genre with same name already exists
+    Genre.findOne({ name }).exec((err, found_genre) => {
+      if (err) return next(err);
+
+      if (found_genre) {
+        // Genre exists, render form again with sanitized values/error messages
+        Genre.findById(id, (err, genre) => {
+          if (err) return next(err);
+
+          const error = new Error();
+          error.msg = 'A genre with this name already exists!';
+
+          res.render('genre_form', {
+            title: 'Update Genre',
+            genre,
+            errors: [error],
+          });
+        });
+
+        return;
+      }
+
+      // Data from form is valid. Update the record.
+      Genre.findByIdAndUpdate(id, genre, (err, updatedGenre) => {
+        if (err) return next(err);
+
+        // Successful: redirect to genre detail page
+        res.redirect(updatedGenre.url);
+      });
+    });
+  },
+];
